@@ -26,7 +26,7 @@ if "bot" not in st.session_state:          # one separate conversation per visit
 clicked = None
 with st.sidebar:
     st.header("Try the demo")
-    st.write("Click in this order:")
+    st.write("Click in this order, and wait for each answer before the next click:")
     examples = [("1. budget 5", "budget 5"),
                 ("2. set the demo protein", "sequence " + EXAMPLE_SEQ),
                 ("3. recommend (ESM-2 only)", "recommend"),
@@ -43,22 +43,24 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-for m in st.session_state.messages:
-    with st.chat_message(m["role"]):
-        st.text(m["content"])
-
 prompt = st.chat_input("Type a command, or paste a protein sequence")
 text = clicked or prompt
+
+history = st.container()
+status = st.empty()
 if text:
+    status.info("Working... please wait for the answer before clicking again.")
+    try:
+        reply = st.session_state.bot.reply(text)
+    except Exception as e:
+        reply = f"Something went wrong ({type(e).__name__}: {e}). Use Reset conversation to start over."
     shown = text if len(text) < 300 else text[:300] + " ..."
+    # saved right away, with no page calls in between, so a new click cannot lose this exchange
     st.session_state.messages.append({"role": "user", "content": shown})
-    with st.chat_message("user"):
-        st.text(shown)
-    with st.chat_message("assistant"):
-        with st.spinner("Working..."):
-            try:
-                reply = st.session_state.bot.reply(text)
-            except Exception as e:
-                reply = f"Something went wrong ({type(e).__name__}: {e}). Use Reset conversation to start over."
-        st.text(reply)
     st.session_state.messages.append({"role": "assistant", "content": reply})
+    status.empty()
+
+with history:
+    for m in st.session_state.messages:
+        with st.chat_message(m["role"]):
+            st.text(m["content"])
